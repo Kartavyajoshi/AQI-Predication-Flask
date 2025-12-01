@@ -1,0 +1,692 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirGuard AI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* Custom styles for the dark theme and smooth transitions */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030712; /* Darker background: Gray-950 */
+            color: #E5E7EB; /* Light text: Gray-200 */
+            min-height: 100vh;
+        }
+        .card {
+            background-color: #111827; /* Card background: Gray-900 */
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            border: 1px solid #1F2937;
+        }
+        .aqi-score {
+            font-size: 5rem; 
+            line-height: 1;
+            font-weight: 700;
+            transition: all 0.5s ease;
+        }
+        .log-entry {
+            font-family: monospace;
+            padding: 0.4rem 0;
+            border-bottom: 1px dashed #374151;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10">
+
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-8 border-b border-gray-800 mb-8">
+        <div class="text-3xl font-extrabold text-blue-400">AIR-Predict 
+            <span class="text-sm font-normal text-gray-500 block sm:inline">AI-Powered Forecasting</span>
+        </div>
+        
+        <div class="flex mt-4 sm:mt-0 w-full sm:w-auto">
+            <input type="text" id="location-input" placeholder="Search City (e.g., Los Angeles)" 
+                   class="p-2.5 w-full sm:w-64 rounded-l-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+            <button id="search-button" class="p-2.5 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 transition duration-150 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="grid grid-cols-12 gap-6">
+        
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6 flex flex-col items-center">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 w-full text-center pb-2">LIVE AQI (<span id="current-location">Central Park, NY</span>)</h2>
+            
+            <div id="aqi-display-wrapper" class="w-full text-center p-4 rounded-xl transition duration-500 border" style="background-color: #1F2937;">
+                <div id="aqi-display" class="aqi-score text-green-400">38</div>
+                <p id="aqi-status" class="text-lg mt-1 font-bold tracking-widest uppercase py-1 text-white">
+                    GOOD
+                </p>
+            </div>
+
+            <div class="mt-4 w-full text-center">
+                <h3 class="text-sm font-semibold text-gray-300">NEXT HOUR AQI</h3>
+                <span id="predicted-aqi-display" class="text-2xl font-bold text-yellow-400">42</span>
+            </div>
+            
+            <div class="flex flex-col text-sm text-gray-400 space-y-3 mt-4 border-t border-gray-700 pt-3 w-full">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-gray-300">TEMP:</span>
+                    <span id="temp-display" class="text-lg text-white">20.5°C</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-gray-300">HUMIDITY:</span>
+                    <span id="humidity-display" class="text-lg text-white">55%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6">
+            <h3 class="text-xl font-semibold mb-4 text-green-400 border-b border-gray-700 pb-2 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.204A9 9 0 0112 21z" />
+                </svg>
+                Health Recommendations
+            </h3>
+            <div class="h-full">
+                <p id="health-advice" class="text-gray-300 text-sm leading-relaxed">
+                    Analyzing current AQI levels...
+                </p>
+            </div>
+        </div>
+
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200">Gas Concentration Trends (Past 30 Min)</h2>
+            <div class="h-64">
+                <canvas id="gasTrendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-200">Long-Term AQI Analysis</h2>
+                <div id="long-term-controls" class="space-x-2">
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-blue-600 hover:bg-blue-700 transition duration-150" data-period="week">Week</button>
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-gray-600 hover:bg-gray-700 transition duration-150" data-period="month">Month</button>
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-gray-600 hover:bg-gray-700 transition duration-150" data-period="year">Year</button>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas id="longTermChart"></canvas>
+            </div>
+        </div>
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6 flex flex-col justify-center items-center text-center bg-gray-900/50">
+            <h3 class="text-lg font-semibold mb-2 text-blue-400 border-b border-gray-700 pb-2 w-full">MODEL CONFIDENCE</h3>
+            <div class="text-5xl font-extrabold text-white" id="model-confidence-display">98.5%</div>
+            <p class="text-sm text-gray-400 mt-2">Prediction Reliability Score</p>
+        </div>
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-blue-400 border-b border-gray-700 pb-2">SENSOR MATRIX</h3>
+            <div id="sensor-matrix" class="space-y-3">
+                </div>
+        </div>
+
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-200">AI PREDICTION LOG</h3>
+            <div id="prediction-log" class="h-64 overflow-y-scroll bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+                <div class="text-sm text-gray-500">Log loading...</div>
+            </div>
+        </div>
+        
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-200">SENSOR LOCATION: <span id="map-location-title">CENTRAL PARK, NY</span></h3>
+            <iframe
+                id="location-map"
+                class="w-full rounded-lg"
+                height="300"
+                loading="lazy"
+                allowfullscreen
+                referrerpolicy="no-referrer-when-downgrade"
+                src="http://googleusercontent.com/maps.google.com/maps?q=Central%20Park,%20NY&t=&z=13&ie=UTF8&iwloc=&output=embed"
+            ></iframe>
+        </div>
+
+    </main>
+    
+    <script type="module">
+        
+        // --- CHART CONFIGS ---
+        
+        const trendChartConfig = {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#D1D5DB' } } }, scales: { y: { beginAtZero: false, grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } }, x: { grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } } } }
+        };
+
+        const longTermChartConfig = {
+            type: 'bar',
+            data: { labels: [], datasets: [] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } }, x: { grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } } } }
+        };
+
+        const trendCtx = document.getElementById('gasTrendChart').getContext('2d');
+        const gasTrendChart = new Chart(trendCtx, trendChartConfig);
+        
+        const longTermCtx = document.getElementById('longTermChart').getContext('2d');
+        const longTermChart = new Chart(longTermCtx, longTermChartConfig);
+
+        let currentActiveLocation = "Central Park, NY";
+        let currentActivePeriod = "week"; 
+
+        // --- FETCHERS ---
+
+        async function fetchLiveData(location) {
+            // Converts "Los Angeles" to "Los-Angeles" for the Flask route
+            const safeLocation = location.replace(/ /g, '-');
+            const url = location === "Central Park, NY" ? '/data' : `/data/${safeLocation}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        }
+
+        async function fetchLongTermData(period) {
+            const response = await fetch(`/long_term_data/${period}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        }
+        
+        // --- UPDATERS ---
+
+        function updateLongTermChart(data) {
+            longTermChart.data.labels = data.labels;
+            longTermChart.data.datasets = data.datasets;
+            
+            // Apply dynamic colors based on AQI values
+            const backgroundColors = data.datasets[0].data.map(aqi => {
+                if (aqi <= 50) return 'rgba(16, 185, 129, 0.7)'; // Green
+                if (aqi <= 100) return 'rgba(251, 191, 36, 0.7)'; // Yellow
+                if (aqi <= 150) return 'rgba(249, 115, 22, 0.7)'; // Orange
+                return 'rgba(239, 68, 68, 0.7)'; // Red
+            });
+            data.datasets[0].backgroundColor = backgroundColors;
+            
+            longTermChart.update();
+        }
+
+        async function updateDashboard() {
+            try {
+                const data = await fetchLiveData(currentActiveLocation);
+
+                // 1. Update Location Titles and Map
+                document.getElementById('current-location').textContent = data.location;
+                document.getElementById('map-location-title').textContent = data.location.toUpperCase();
+                const mapIframe = document.getElementById('location-map');
+                mapIframe.src = `https://maps.google.com/maps?q=${encodeURIComponent(data.location)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+
+                // 2. Update AQI, Prediction, and Metrics
+                document.getElementById('aqi-display').textContent = data.aqi;
+                document.getElementById('predicted-aqi-display').textContent = data.predicted_aqi;
+                document.getElementById('temp-display').textContent = `${data.temp}°C`;
+                document.getElementById('humidity-display').textContent = `${data.humidity}%`;
+                
+                // 3. Dynamic Styling, Status, and Health Advice
+                const aqiDisplay = document.getElementById('aqi-display');
+                const aqiStatus = document.getElementById('aqi-status');
+                const aqiWrapper = document.getElementById('aqi-display-wrapper');
+                
+                // Use classes from backend for dynamic styling
+                aqiDisplay.className = `aqi-score ${data.aqi_color_class}`;
+                aqiStatus.textContent = data.aqi_status;
+                aqiWrapper.className = `w-full text-center p-4 rounded-xl transition duration-500 border ${data.aqi_bg_class}`;
+                
+                document.getElementById('model-confidence-display').textContent = `${data.model_confidence}%`;
+                document.getElementById('health-advice').textContent = data.health_advice;
+                
+                // 4. Sensor Matrix
+                const matrixElement = document.getElementById('sensor-matrix');
+                matrixElement.innerHTML = ''; 
+
+                for (const [gas, val] of Object.entries(data.gas_data)) {
+                    const isHigh = (gas === 'NO2' && val.level > 90) || (gas === 'CO' && val.level > 2.5);
+                    const item = document.createElement('div');
+                    item.className = 'sensor-item p-3 bg-gray-900/50 rounded-lg flex justify-between items-center transition duration-200 hover:bg-gray-800';
+                    item.innerHTML = `
+                        <div>
+                            <p class="text-sm font-light text-gray-300">${gas}</p>
+                            <p class="text-2xl font-bold text-white mt-0.5">${val.level}<span class="text-sm font-normal text-gray-400 ml-1">${val.unit}</span></p>
+                        </div>
+                        <div class="w-3 h-3 rounded-full ${isHigh ? 'bg-red-500 animate-pulse' : 'bg-green-500'}"></div>
+                    `;
+                    matrixElement.appendChild(item);
+                }
+
+                // 5. Gas Concentration Trends Chart
+                gasTrendChart.data = data.trend_data;
+                gasTrendChart.update();
+                
+                // 6. Prediction Log
+                const logElement = document.getElementById('prediction-log');
+                logElement.innerHTML = ''; 
+                
+                data.log.forEach(entry => {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'log-entry text-sm text-gray-300';
+                    logEntry.innerHTML = entry; 
+                    logElement.prepend(logEntry);
+                });
+
+            } catch (error) {
+                console.error("Error fetching or processing data:", error);
+                document.getElementById('aqi-display').textContent = 'ERR';
+                document.getElementById('health-advice').textContent = 'Could not load data. Check console.';
+            }
+        }
+        
+        // --- EVENT LISTENERS ---
+
+        // Location Search
+        document.getElementById('search-button').addEventListener('click', () => {
+            const locationInput = document.getElementById('location-input').value.trim();
+            if (locationInput) {
+                currentActiveLocation = locationInput;
+                updateDashboard(); 
+            }
+        });
+        
+        // Long-Term Analysis Buttons
+        document.querySelectorAll('.period-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const newPeriod = event.target.dataset.period;
+                
+                // Update active button style
+                document.querySelectorAll('.period-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                });
+                event.target.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                event.target.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                
+                // Fetch and update chart
+                currentActivePeriod = newPeriod;
+                fetchLongTermData(newPeriod).then(updateLongTermChart);
+            });
+        });
+
+        // --- Polling Setup ---
+        
+        // 1. Initial Load: Load live data and the default long-term data ('week')
+        updateDashboard();
+        fetchLongTermData(currentActivePeriod).then(updateLongTermChart);
+
+        // 2. Set up polling for live data refresh (every 5 seconds)
+        setInterval(updateDashboard, 5000); 
+
+    </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirGuard AI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* Custom styles for the dark theme and smooth transitions */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030712; /* Darker background: Gray-950 */
+            color: #E5E7EB; /* Light text: Gray-200 */
+            min-height: 100vh;
+        }
+        .card {
+            background-color: #111827; /* Card background: Gray-900 */
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            border: 1px solid #1F2937;
+        }
+        .aqi-score {
+            font-size: 5rem; 
+            line-height: 1;
+            font-weight: 700;
+            transition: all 0.5s ease;
+        }
+        .log-entry {
+            font-family: monospace;
+            padding: 0.4rem 0;
+            border-bottom: 1px dashed #374151;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10">
+
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-8 border-b border-gray-800 mb-8">
+        <div class="text-3xl font-extrabold text-blue-400">AIR-Predict 
+            <span class="text-sm font-normal text-gray-500 block sm:inline">AI-Powered Air Quality Forecasting</span>
+        </div>
+        
+        <div class="flex mt-4 sm:mt-0 w-full sm:w-auto">
+            <input type="text" id="location-input" placeholder="Search City (e.g., Los Angeles)" 
+                   class="p-2.5 w-full sm:w-64 rounded-l-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+            <button id="search-button" class="p-2.5 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 transition duration-150 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="grid grid-cols-12 gap-6">
+        
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6 flex flex-col items-center">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 w-full text-center pb-2">LIVE AQI (<span id="current-location">Central Park, NY</span>)</h2>
+            
+            <div id="aqi-display-wrapper" class="w-full text-center p-4 rounded-xl transition duration-500 border" style="background-color: #1F2937;">
+                <div id="aqi-display" class="aqi-score text-green-400">38</div>
+                <p id="aqi-status" class="text-lg mt-1 font-bold tracking-widest uppercase py-1 text-white">
+                    GOOD
+                </p>
+            </div>
+
+            <div class="flex flex-col text-sm text-gray-400 space-y-3 mt-4 border-t border-gray-700 pt-3 w-full">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-gray-300">TEMP:</span>
+                    <span id="temp-display" class="text-lg text-white">20.5°C</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-gray-300">HUMIDITY:</span>
+                    <span id="humidity-display" class="text-lg text-white">55%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6">
+            <h3 class="text-xl font-semibold mb-4 text-green-400 border-b border-gray-700 pb-2 flex items-center">
+                Health Recommendations
+            </h3>
+            <div class="h-full">
+                <p id="health-advice" class="text-gray-300 text-sm leading-relaxed">
+                    Analyzing current AQI levels...
+                </p>
+            </div>
+        </div>
+        
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">Gas Concentration Proportions</h3>
+            <div class="h-64">
+                <canvas id="gasProportionChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6 flex flex-col justify-between items-center bg-blue-900/10 border-blue-600/50">
+            <div>
+                <h3 class="text-xl font-semibold mb-2 text-blue-400 w-full text-center pb-2 border-b border-gray-700">NEXT HOUR AQI</h3>
+                <div class="text-6xl font-extrabold text-white text-center" id="predicted-aqi-display">42</div>
+            </div>
+            <div class="mt-6 w-full text-center">
+                <h3 class="text-sm font-semibold mb-2 text-green-400 border-t border-gray-700 pt-2">MODEL CONFIDENCE</h3>
+                <div class="text-3xl font-extrabold text-green-300" id="model-confidence-display">98.5%</div>
+            </div>
+        </div>
+
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200">Pollutant Concentration Trends (CO, NO2, O3)</h2>
+            <div class="h-64">
+                <canvas id="gasTrendChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-span-12 lg:col-span-6 card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-200">Long-Term AQI Analysis</h2>
+                <div id="long-term-controls" class="space-x-2">
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-blue-600 hover:bg-blue-700 transition duration-150" data-period="week">Week</button>
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-gray-600 hover:bg-gray-700 transition duration-150" data-period="month">Month</button>
+                    <button class="period-btn px-3 py-1 text-xs font-medium rounded bg-gray-600 hover:bg-gray-700 transition duration-150" data-period="year">Year</button>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas id="longTermChart"></canvas>
+            </div>
+        </div>
+
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-blue-400 border-b border-gray-700 pb-2">SENSOR MATRIX</h3>
+            <div id="sensor-matrix" class="space-y-4">
+                </div>
+        </div>
+
+        <div class="col-span-12 md:col-span-6 lg:col-span-9 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-200">AI EVENT LOG</h3>
+            <div id="prediction-log" class="h-64 overflow-y-scroll bg-gray-900 p-3 rounded-lg border border-gray-700">
+                </div>
+        </div>
+        
+        <div class="col-span-12 card p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-200">SENSOR LOCATION: <span id="map-location-title">CENTRAL PARK, NY</span></h3>
+            <iframe
+                id="location-map"
+                class="w-full rounded-lg"
+                height="300"
+                loading="lazy"
+                allowfullscreen
+                referrerpolicy="no-referrer-when-downgrade"
+                src="http://googleusercontent.com/maps.google.com/maps?q=Central%20Park,%20NY&t=&z=13&ie=UTF8&iwloc=&output=embed"
+            ></iframe>
+        </div>
+
+    </main>
+    
+    <script type="module">
+        
+        const CHART_COLORS = {
+            blue: '#3B82F6',   // CO
+            amber: '#F59E0B',  // NO2
+            violet: '#A855F7', // O3
+            red: '#EF4444',    // C6H6 
+            teal: '#2DD4BF'    // NOx 
+        };
+
+        let currentActiveLocation = "Central Park, NY";
+        let currentActivePeriod = "week"; 
+
+        // --- CHART CONFIGS ---
+
+        const baseChartOptions = { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { labels: { color: '#D1D5DB' } } }, 
+            scales: { y: { beginAtZero: false, grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } }, x: { grid: { color: '#374151' }, ticks: { color: '#D1D5DB' } } } 
+        };
+        
+        const trendCtx = document.getElementById('gasTrendChart').getContext('2d');
+        const gasTrendChart = new Chart(trendCtx, { type: 'line', data: { labels: [], datasets: [] }, options: baseChartOptions });
+        
+        const longTermCtx = document.getElementById('longTermChart').getContext('2d');
+        const longTermChart = new Chart(longTermCtx, { type: 'bar', data: { labels: [], datasets: [] }, options: {...baseChartOptions, plugins: { legend: { display: false } }} });
+
+        const proportionCtx = document.getElementById('gasProportionChart').getContext('2d');
+        const gasProportionChart = new Chart(proportionCtx, {
+            type: 'doughnut', 
+            data: { labels: [], datasets: [{ data: [], backgroundColor: [CHART_COLORS.blue, CHART_COLORS.teal, CHART_COLORS.red, CHART_COLORS.amber, CHART_COLORS.violet], hoverOffset: 10, }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#D1D5DB' } } } }
+        });
+
+
+        // --- FETCHERS ---
+
+        async function fetchLiveData(location) {
+            const safeLocation = location.replace(/ /g, '-');
+            const url = location === "Central Park, NY" ? '/data' : `/data/${safeLocation}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        }
+
+        async function fetchLongTermData(period) {
+            const response = await fetch(`/long_term_data/${period}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        }
+        
+        // --- UPDATERS ---
+        
+        function updateLongTermChart(data) {
+            longTermChart.data.labels = data.labels;
+            longTermChart.data.datasets = data.datasets;
+            
+            // Dynamic color for bars based on AQI level
+            const backgroundColors = data.datasets[0].data.map(aqi => {
+                if (aqi <= 50) return 'rgba(16, 185, 129, 0.7)'; // Green
+                if (aqi <= 100) return 'rgba(251, 191, 36, 0.7)'; // Yellow
+                if (aqi <= 150) return 'rgba(249, 115, 22, 0.7)'; // Orange
+                return 'rgba(239, 68, 68, 0.7)'; // Red
+            });
+            data.datasets[0].backgroundColor = backgroundColors;
+            
+            longTermChart.update();
+        }
+
+        function updateProportionChart(data) {
+            const gasLabels = Object.keys(data.gas_data);
+            const gasLevels = Object.values(data.gas_data).map(item => {
+                // Scale values for visualization (if they are in different units like ppb vs µg/m³)
+                return item.level * (item.unit === 'ppb' ? 5 : 1); 
+            });
+            
+            gasProportionChart.data.labels = gasLabels;
+            gasProportionChart.data.datasets[0].data = gasLevels;
+            gasProportionChart.data.datasets[0].backgroundColor = [
+                CHART_COLORS.blue, CHART_COLORS.teal, CHART_COLORS.red, CHART_COLORS.amber, CHART_COLORS.violet
+            ];
+            gasProportionChart.update();
+        }
+
+        async function updateDashboard() {
+            try {
+                const data = await fetchLiveData(currentActiveLocation);
+
+                // 1. Update Location Titles and Map
+                document.getElementById('current-location').textContent = data.location;
+                document.getElementById('map-location-title').textContent = data.location.toUpperCase();
+                const mapIframe = document.getElementById('location-map');
+                const safeQuery = encodeURIComponent(data.location);
+                mapIframe.src = `http://googleusercontent.com/maps.google.com/maps?q=${safeQuery}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+
+                // 2. Update AQI, Prediction, and Metrics (including dynamic colors)
+                document.getElementById('aqi-display').textContent = data.aqi;
+                document.getElementById('predicted-aqi-display').textContent = data.predicted_aqi;
+                document.getElementById('model-confidence-display').textContent = `${data.model_confidence}%`;
+                document.getElementById('temp-display').textContent = `${data.temp}°C`;
+                document.getElementById('humidity-display').textContent = `${data.humidity}%`;
+                
+                const aqiDisplay = document.getElementById('aqi-display');
+                const aqiStatus = document.getElementById('aqi-status');
+                const aqiWrapper = document.getElementById('aqi-display-wrapper');
+                const healthAdvice = document.getElementById('health-advice');
+                
+                // Clear and apply classes from backend
+                aqiDisplay.className = `aqi-score ${data.aqi_color_class}`;
+                aqiStatus.textContent = data.aqi_status;
+                aqiWrapper.className = `w-full text-center p-4 rounded-xl transition duration-500 border ${data.aqi_bg_class}`;
+                healthAdvice.textContent = data.health_advice;
+
+                // 3. Update Sensor Matrix
+                const matrixElement = document.getElementById('sensor-matrix');
+                matrixElement.innerHTML = ''; 
+
+                for (const [gas, val] of Object.entries(data.gas_data)) {
+                    // Safety threshold logic
+                    const isHigh = (gas === 'NO2' && val.level > 90) || 
+                                   (gas === 'CO' && val.level > 2.5) || 
+                                   (gas === 'O3' && val.level > 12.0) ||
+                                   (gas === 'NOx' && val.level > 50.0);
+
+                    const item = document.createElement('div');
+                    item.className = 'sensor-item p-4 bg-gray-900/50 rounded-lg flex justify-between items-center transition duration-200 hover:bg-gray-800';
+                    item.innerHTML = `
+                        <div>
+                            <p class="text-sm font-light text-gray-300">${gas}</p>
+                            <p class="text-3xl font-bold text-white mt-1">${val.level}<span class="text-base font-normal text-gray-400 ml-1">${val.unit}</span></p>
+                        </div>
+                        <div class="w-3 h-3 rounded-full ${isHigh ? 'bg-red-500 animate-pulse' : 'bg-green-500'}"></div>
+                    `;
+                    matrixElement.appendChild(item);
+                }
+
+                // 4. Update Gas Charts
+                gasTrendChart.data = data.trend_data;
+                gasTrendChart.update();
+                updateProportionChart(data); // Call the new chart update function
+                
+                // 5. Update Prediction Log
+                const logElement = document.getElementById('prediction-log');
+                logElement.innerHTML = ''; 
+                
+                data.log.forEach(entry => {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'log-entry text-sm text-gray-400';
+                    
+                    if (entry.includes('Model confidence level')) {
+                         logEntry.innerHTML = entry.replace(/Model confidence level: (\d+\.\d+)%/, 
+                            '<span class="text-green-400">Model confidence level: $1%</span>');
+                    } else if (entry.includes('Predicted Next Hour AQI')) {
+                         logEntry.innerHTML = entry.replace(/Predicted Next Hour AQI: (\d+)/, 
+                            '<span class="text-blue-400">Predicted Next Hour AQI: $1</span>');
+                    } else if (entry.includes('Current AQI')) {
+                         // Use the color class defined in the data object
+                         logEntry.innerHTML = entry.replace(/Current AQI: (\d+) \(([A-Z ]+)\)/, 
+                            `Current AQI: <span class="${data.aqi_color_class}">\$1 (\$2)</span>`);
+                    } else {
+                        logEntry.textContent = entry;
+                    }
+                    
+                    logElement.prepend(logEntry);
+                });
+
+
+            } catch (error) {
+                console.error("Error fetching or processing data:", error);
+                document.getElementById('aqi-display').textContent = 'ERR';
+                document.getElementById('health-advice').textContent = 'Could not load data. Check console.';
+            }
+        }
+        
+        // --- EVENT LISTENERS ---
+
+        // Location Search
+        document.getElementById('search-button').addEventListener('click', () => {
+            const locationInput = document.getElementById('location-input').value.trim();
+            if (locationInput) {
+                currentActiveLocation = locationInput;
+                updateDashboard(); 
+            }
+        });
+        
+        // Long-Term Analysis Buttons
+        document.querySelectorAll('.period-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const newPeriod = event.target.dataset.period;
+                
+                // Update active button style
+                document.querySelectorAll('.period-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                });
+                event.target.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                event.target.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                
+                // Fetch and update chart
+                currentActivePeriod = newPeriod;
+                fetchLongTermData(newPeriod).then(updateLongTermChart);
+            });
+        });
+
+        // --- Polling Setup ---
+        updateDashboard();
+        fetchLongTermData(currentActivePeriod).then(updateLongTermChart);
+        setInterval(updateDashboard, 5000); 
+
+    </script>
+</body>
+</html>
